@@ -1,4 +1,5 @@
 import os
+import io
 import google.generativeai as genai
 from dotenv import load_dotenv
 import PIL.Image
@@ -32,15 +33,29 @@ model = genai.GenerativeModel(
     generation_config={"response_mime_type": "application/json"}
 )
 
+PROMPT_IDENTIFICACION = (
+    "Actúa como un experto en hardware. Identifica marca, modelo y categoría. "
+    "Responde solo en JSON: {'marca': '...', 'modelo': '...', 'categoria': '...'}"
+)
+
+
+def _identificar(img: PIL.Image.Image) -> str:
+    response = model.generate_content([PROMPT_IDENTIFICACION, img])
+    return response.text
+
+
 def identificar_hardware(ruta_imagen: str) -> str:
+    """Identifica desde una ruta en disco (uso por CLI / pruebas)."""
     try:
-        img = PIL.Image.open(ruta_imagen)
-        prompt = (
-            "Actúa como un experto en hardware. Identifica marca, modelo y categoría. "
-            "Responde solo en JSON: {'marca': '...', 'modelo': '...', 'categoria': '...'}"
-        )
-        response = model.generate_content([prompt, img])
-        return response.text
+        return _identificar(PIL.Image.open(ruta_imagen))
+    except Exception as e:
+        return f'{{"error": "{str(e)}"}}'
+
+
+def identificar_desde_bytes(datos: bytes) -> str:
+    """Identifica desde bytes de imagen (uso por el endpoint de FastAPI)."""
+    try:
+        return _identificar(PIL.Image.open(io.BytesIO(datos)))
     except Exception as e:
         return f'{{"error": "{str(e)}"}}'
 

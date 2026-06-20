@@ -1,29 +1,87 @@
-import asyncio
+"""ComparaLO - API REST.
+
+Flujo: Imagen -> Identificación IA (Gemini) -> Scraping concurrente -> JSON.
+
+Levantar en desarrollo:
+    uvicorn main:app --reload
+"""
 import json
-from ai_module import identificar_hardware
-from scraping_module import buscar_precios
+from contextlib import asynccontextmanager
 
-async def ejecutar_comparador(ruta_foto):
-    print(f"📸 Procesando imagen: {ruta_foto}...")
-    
-    # 1. LA IA IDENTIFICA
-    res_ia = identificar_hardware(ruta_foto)
-    datos = json.loads(res_ia) # Convertimos el texto JSON a diccionario
-    
-    nombre_identificado = f"{datos.get('marca')} {datos.get('modelo')}"
-    print(f"🤖 IA Identificó: {nombre_identificado}")
-    
-    # 2. EL SCRAPING BUSCA (Usando el nombre de la IA)
-    print(f"🔍 Buscando precios para '{nombre_identificado}'...")
-    lista_precios = await buscar_precios(nombre_identificado)
-    
-    # 3. COMPARACIÓN
-    print("\n--- COMPARATIVA DE PRECIOS ---")
-    # Ordenamos por precio de menor a mayor
-    lista_precios.sort(key=lambda x: x['precio'])
-    
-    for item in lista_precios:
-        print(f"💰 {item['tienda']}: ${item['precio']} -> Link: {item['url']}")
+from fastapi import FastAPI, File, UploadFile, HTTPException
 
-if __name__ == "__main__":
-    asyncio.run(ejecutar_comparador("prueba.jpg"))
+from ai_module import identificar_desde_bytes
+from core.browser import gestor_navegador
+from core.models import ProductoIdentificado, RespuestaIdentificacion
+from scraping_service import buscar_precios, mejor_precio
+
+
+def es_imagen_valida(datos: bytes) -> bool:
+    """Valida por *magic bytes*, no por el content-type que manda el cliente.
+
+    Soporta JPEG, PNG y WEBP. Es más fiable porque apps móviles a veces
+    envían 'application/octet-stream' aunque el archivo sí sea una imagen.
+    """
+    if datos[:3] == b"\xff\xd8\xff":                      # JPEG
+        return True
+    if datos[:8] == b"\x89PNG\r\n\x1a\n":                 # PNG
+        return True
+    if datos[:4] == b"RIFF" and datos[8:12] == b"WEBP":   # WEBP
+        return True
+    return False
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Arranca el navegador UNA vez al iniciar la app...
+    await gestor_navegador.iniciar()
+    yield
+    # ...y lo cierra limpiamente al apagarla.
+    await gestor_navegador.cerrar()
+
+
+app = FastAPI(title="ComparaLO API", version="1.0.0", lifespan=lifespan)
+
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
+
+
+@app.post("/identify", response_model=RespuestaIdentificacion)
+async def identify(file: UploadFile = File(...)):
+    datos_imagen = await file.read()
+    if not es_imagen_valida(datos_imagen):
+        raise HTTPException(
+            status_code=415,
+            detail="El archivo no es una imagen válida. Usa JPEG, PNG o WEBP.",
+        )
+
+    # 1) IA identifica el producto.
+    crudo = identificar_desde_bytes(datos_imagen)
+    try:
+        info = json.loads(crudo)
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=502, detail="La IA devolvió un JSON inválido.")
+    if "error" in info:
+        raise HTTPException(status_code=502, detail=f"Error de IA: {info['error']}")
+
+    producto = ProductoIdentificado(
+        marca=info.get("marca"),
+        modelo=info.get("modelo"),
+        categoria=info.get("categoria"),
+    )
+    termino = producto.nombre_busqueda
+    if not termino:
+        raise HTTPException(status_code=422, detail="La IA no pudo identificar el producto.")
+
+    # 2) Scraping concurrente en todas las tiendas.
+    resultados = await buscar_precios(termino)
+
+    # 3) Respuesta JSON.
+    return RespuestaIdentificacion(
+        producto=producto,
+        termino_busqueda=termino,
+        resultados=resultados,
+        mejor_precio=mejor_precio(resultados),
+    )
