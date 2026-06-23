@@ -38,4 +38,4 @@ class HiraokaScraper(BaseScraper):
         except Exception:
             pass
 
-        return {"precio": precio, "titulo": titulo, "url": url}
+        return {"precio": precio, "titulo": titulo, "url": url, "moneda": "PEN"}

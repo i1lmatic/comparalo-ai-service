@@ -3,9 +3,10 @@
 Flujo: Imagen -> Identificación IA (Gemini) -> Scraping concurrente -> JSON.
 
 Levantar en desarrollo:
-    uvicorn main:app --reload
+    python run.py
+(o sin recarga en caliente):
+    uvicorn main:app --port 8000
 """
-import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -58,18 +59,20 @@ async def identify(file: UploadFile = File(...)):
         )
 
     # 1) IA identifica el producto.
-    crudo = identificar_desde_bytes(datos_imagen)
-    try:
-        info = json.loads(crudo)
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=502, detail="La IA devolvió un JSON inválido.")
+    info = identificar_desde_bytes(datos_imagen)
     if "error" in info:
         raise HTTPException(status_code=502, detail=f"Error de IA: {info['error']}")
+    if info.get("categoria") == "otro":
+        raise HTTPException(
+            status_code=422,
+            detail="La imagen no parece un componente informático.",
+        )
 
     producto = ProductoIdentificado(
         marca=info.get("marca"),
         modelo=info.get("modelo"),
         categoria=info.get("categoria"),
+        termino_busqueda=info.get("termino_busqueda"),
     )
     termino = producto.nombre_busqueda
     if not termino:
