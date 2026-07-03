@@ -1,0 +1,12 @@
+venv/
+.venv/
+__pycache__/
+*.pyc
+.env
+*.log
+prueba.jpg
+.git/
+.gitignore.bak
+amazon_diag.*
+diag_*.py
+test_*.py

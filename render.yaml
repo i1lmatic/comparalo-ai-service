@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: comparalo-ai
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      # Secretos: se configuran manualmente en el dashboard de Render.
+      # sync: false significa que NO se sincroniza desde este archivo
+      # (Render te pedira el valor la primera vez).
+      - key: GEMINI_API_KEY
+        sync: false
+      # Valores no sensibles: van directo en este archivo.
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash-lite
+      - key: TIPO_CAMBIO_USD_PEN
+        value: "3.75"

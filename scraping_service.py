@@ -24,7 +24,7 @@ MAX_CONCURRENTES = 4
 TIPO_CAMBIO_USD_PEN = float(os.getenv("TIPO_CAMBIO_USD_PEN", "3.75"))
 
 # Umbral mínimo de relevancia (0-100). Por debajo, el resultado se descarta.
-UMBRAL_RELEVANCIA = 50
+UMBRAL_RELEVANCIA = 35
 
 # Palabras muy comunes que no aportan a la comparación de títulos.
 _STOPWORDS = {
