@@ -7,6 +7,7 @@ Levantar en desarrollo:
 (o sin recarga en caliente):
     uvicorn main:app --port 8000
 """
+import logging
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, File, UploadFile, HTTPException
@@ -35,7 +36,11 @@ def es_imagen_valida(datos: bytes) -> bool:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Arranca el navegador UNA vez al iniciar la app...
-    await gestor_navegador.iniciar()
+    try:
+        await gestor_navegador.iniciar()
+    except Exception as e:
+        logging.error("FALLO al iniciar el navegador: %s", e)
+        raise
     yield
     # ...y lo cierra limpiamente al apagarla.
     await gestor_navegador.cerrar()

@@ -18,7 +18,7 @@ from scrapers.registry import SCRAPERS_ACTIVOS
 
 # Cuántas tiendas consultar simultáneamente. Subir gasta más RAM/CPU;
 # bajar reduce el riesgo de parecer un bot agresivo.
-MAX_CONCURRENTES = 4
+MAX_CONCURRENTES = 2
 
 # Tipo de cambio USD -> PEN. Configurable por .env para mantenerlo fresco.
 TIPO_CAMBIO_USD_PEN = float(os.getenv("TIPO_CAMBIO_USD_PEN", "3.75"))

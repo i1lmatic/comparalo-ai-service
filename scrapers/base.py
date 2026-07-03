@@ -19,7 +19,7 @@ RECURSOS_BLOQUEADOS = {"image", "media", "font"}
 
 class BaseScraper(ABC):
     tienda: str = "Desconocida"
-    timeout: int = 15000  # ms para goto / wait_for_selector
+    timeout: int = 25000  # ms para goto / wait_for_selector (nube es mas lenta)
     bloquear_recursos: bool = True
 
     # ---- Métodos que CADA tienda debe implementar -------------------------
